@@ -2,7 +2,8 @@ package pl.foxsoftware.batterywatch.data
 
 data class ProcessCpu(val pid: Int, val name: String, val totalPct: Double, val userPct: Double, val kernelPct: Double)
 
-data class CpuInfo(val window: String?, val load: String?, val processes: List<ProcessCpu>)
+/** [windowSeconds] gdy udało się odczytać długość okna pomiaru, inaczej surowy opis w [windowRaw]. */
+data class CpuInfo(val windowSeconds: Long?, val windowRaw: String?, val load: String?, val processes: List<ProcessCpu>)
 
 /** Parser `dumpsys cpuinfo` (średnie obciążenie z ostatnich kilkudziesięciu sekund). */
 object CpuInfoParser {
@@ -22,12 +23,11 @@ object CpuInfoParser {
                 )
             }
         }
+        val window = lines.firstOrNull { it.startsWith("CPU usage from") }?.substringAfter("CPU usage from ")?.substringBefore(" (")
+        val ms = window?.let { Regex("""(\d+)ms to (\d+)ms ago""").find(it) }
         return CpuInfo(
-            window = lines.firstOrNull { it.startsWith("CPU usage from") }?.substringAfter("CPU usage from ")?.substringBefore(" (")
-                ?.let { w ->
-                    val ms = Regex("""(\d+)ms to (\d+)ms ago""").find(w)
-                    if (ms != null) "ostatnie ${(ms.groupValues[1].toLong() - ms.groupValues[2].toLong()) / 1000} s" else w
-                },
+            windowSeconds = ms?.let { (it.groupValues[1].toLong() - it.groupValues[2].toLong()) / 1000 },
+            windowRaw = if (ms == null) window else null,
             load = lines.firstOrNull { it.startsWith("Load:") }?.substringAfter("Load: "),
             processes = procs.sortedByDescending { it.totalPct },
         )

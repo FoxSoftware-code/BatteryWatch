@@ -25,9 +25,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import pl.foxsoftware.batterywatch.MainActivity
+import pl.foxsoftware.batterywatch.R
 import pl.foxsoftware.batterywatch.data.ChargingDb
 import pl.foxsoftware.batterywatch.data.ChargingPrefs
 import pl.foxsoftware.batterywatch.data.DeviceReader
+import pl.foxsoftware.batterywatch.data.Plug
 import pl.foxsoftware.batterywatch.domain.ChargeSample
 
 /**
@@ -71,7 +73,7 @@ class ChargingMonitorService : Service() {
             scope.launch { finish(unplugged = false) }
             return START_NOT_STICKY
         }
-        val n = buildNotification("Uruchamianie…", null)
+        val n = buildNotification(getString(R.string.notif_starting), null)
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
@@ -138,7 +140,7 @@ class ChargingMonitorService : Service() {
             targetNotified = true
             nm.notify(
                 ALERT_TARGET_ID,
-                alert("Bateria naładowana do ${s.levelPct}%", "Możesz odłączyć ładowarkę (ustawiony próg: $target%)."),
+                alert(getString(R.string.notif_target_title, s.levelPct), getString(R.string.notif_target_text, target)),
             )
         }
         val alarm = prefs.tempAlarmC
@@ -148,8 +150,8 @@ class ChargingMonitorService : Service() {
             nm.notify(
                 ALERT_TEMP_ID,
                 alert(
-                    "Telefon grzeje się podczas ładowania: %.1f °C".format(s.temperatureC),
-                    "Odłóż telefon, zdejmij etui albo przenieś go w chłodniejsze miejsce.",
+                    getString(R.string.notif_temp_title, s.temperatureC),
+                    getString(R.string.notif_temp_text),
                 ),
             )
         }
@@ -196,12 +198,15 @@ class ChargingMonitorService : Service() {
         )
         return Notification.Builder(this, CHANNEL_MONITOR)
             .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
-            .setContentTitle("Monitorowanie ładowania" + (plug?.let { " ($it)" } ?: ""))
+            .setContentTitle(
+                Plug.label(plug)?.let { getString(R.string.notif_monitor_title_plug, getString(it)) }
+                    ?: getString(R.string.notif_monitor_title),
+            )
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(open)
-            .addAction(Notification.Action.Builder(null, "Zatrzymaj", stop).build())
+            .addAction(Notification.Action.Builder(null, getString(R.string.stop), stop).build())
             .build()
     }
 
@@ -247,10 +252,10 @@ class ChargingMonitorService : Service() {
         fun createChannels(context: Context) {
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_MONITOR, "Monitorowanie ładowania", NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(CHANNEL_MONITOR, context.getString(R.string.channel_monitor), NotificationManager.IMPORTANCE_LOW),
             )
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ALERTS, "Alerty ładowania", NotificationManager.IMPORTANCE_HIGH),
+                NotificationChannel(CHANNEL_ALERTS, context.getString(R.string.channel_alerts), NotificationManager.IMPORTANCE_HIGH),
             )
         }
 

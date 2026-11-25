@@ -17,7 +17,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import pl.foxsoftware.batterywatch.R
 import java.text.DateFormat
 import java.util.Date
 
@@ -29,42 +31,42 @@ fun HistoryScreen(vm: MainViewModel) {
 
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(24 to "24 h", 72 to "3 dni", 168 to "7 dni").forEach { (h, label) ->
+            listOf(24 to "24 h", 72 to stringResource(R.string.hist_3d), 168 to stringResource(R.string.hist_7d)).forEach { (h, label) ->
                 FilterChip(selected = hours == h, onClick = { hours = h }, label = { Text(label) })
             }
         }
         val (samples, stats) = history ?: return@Column
+        val first = samples.firstOrNull()?.let { DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it.timestamp)) }
         Text(
-            "Próbka co ~15 min (WorkManager). Zapisanych: ${samples.size}" +
-                (samples.firstOrNull()?.let { " od ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it.timestamp))}" } ?: ""),
+            if (first != null) stringResource(R.string.hist_samples_since, samples.size, first)
+            else stringResource(R.string.hist_samples, samples.size),
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(top = 8.dp),
         )
         Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatTile(
-                "Ekran zgaszony",
+                stringResource(R.string.screen_off),
                 stats.screenOffPctPerHour?.let { "%.1f%%/h".format(it) } ?: "–",
                 Modifier.weight(1f),
-                "z %.1f h".format(stats.screenOffHours),
+                stringResource(R.string.hist_from_hours, stats.screenOffHours),
             )
             StatTile(
-                "Ekran włączony",
+                stringResource(R.string.screen_on),
                 stats.screenOnPctPerHour?.let { "%.1f%%/h".format(it) } ?: "–",
                 Modifier.weight(1f),
-                "z %.1f h".format(stats.screenOnHours),
+                stringResource(R.string.hist_from_hours, stats.screenOnHours),
             )
         }
-        SectionTitle("Poziom baterii [%] (tło: ekran włączony)")
+        SectionTitle(stringResource(R.string.hist_level_chart))
         LineChart(
             samples.map { it.levelPct.toFloat() },
             minY = 0f, maxY = 100f,
             shade = samples.map { it.screenOnFraction.toFloat() },
         )
-        SectionTitle("Temperatura [°C]")
+        SectionTitle(stringResource(R.string.chart_temperature))
         LineChart(samples.map { it.temperatureC.toFloat() })
         Text(
-            "Gdy historia jest pusta: pierwsza próbka pojawi się w ciągu 15 min od instalacji. " +
-                "Do rozróżnienia ekranu włączonego i zgaszonego potrzebny jest dostęp do danych o użyciu.",
+            stringResource(R.string.hist_empty_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 12.dp),

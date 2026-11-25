@@ -22,10 +22,24 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import pl.foxsoftware.batterywatch.R
+import pl.foxsoftware.batterywatch.data.Plug
 import pl.foxsoftware.batterywatch.domain.FixAction
 import pl.foxsoftware.batterywatch.domain.Severity
+import pl.foxsoftware.batterywatch.domain.Txt
+import pl.foxsoftware.batterywatch.domain.resolve
+
+/** Rozwiązuje [Txt] z warstwy domeny w bieżącym języku. */
+@Composable
+fun Txt.asString(): String = resolve(LocalResources.current)
+
+/** Przetłumaczona nazwa rodzaju zasilania albo null, gdy na baterii. */
+@Composable
+fun plugLabel(code: String?): String? = Plug.label(code)?.let { stringResource(it) }
 
 @Composable
 fun SectionTitle(text: String) {
@@ -82,7 +96,7 @@ fun LineChart(
     Card(modifier.fillMaxWidth(), colors = CardDefaults.cardColors()) {
         Column(Modifier.padding(12.dp)) {
             if (values.size < 2) {
-                Text("Za mało danych do wykresu", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.chart_not_enough), style = MaterialTheme.typography.bodySmall)
                 return@Column
             }
             val lo = minY ?: values.min()
@@ -121,19 +135,17 @@ fun LineChart(
 fun ConfirmDialog(action: FixAction?, onConfirm: (FixAction) -> Unit, onDismiss: () -> Unit) {
     if (action == null) return
     val details = when (action) {
-        is FixAction.SetGlobal -> "Zmiana ustawienia ${action.key} na ${action.value}. Można cofnąć w zakładce Akcje."
-        is FixAction.SetSystem -> "Zmiana ustawienia ${action.key} na ${action.value}. Można cofnąć w zakładce Akcje."
-        is FixAction.ShellCommand -> "Polecenie: ${action.command}\n(bez Shizuku zostaną otwarte ustawienia)"
-        is FixAction.OpenSettings -> "Otworzę odpowiedni ekran ustawień."
-        is FixAction.RestrictApp -> "Aplikacja ${action.packageName} nie będzie mogła działać w tle " +
-            "(powiadomienia push mogą przychodzić z opóźnieniem). Z Shizuku można to cofnąć w zakładce Akcje; " +
-            "bez Shizuku otworzę ustawienia aplikacji."
+        is FixAction.SetGlobal -> stringResource(R.string.confirm_setting, action.key, action.value)
+        is FixAction.SetSystem -> stringResource(R.string.confirm_setting, action.key, action.value)
+        is FixAction.ShellCommand -> stringResource(R.string.confirm_shell, action.command)
+        is FixAction.OpenSettings -> stringResource(R.string.confirm_open_settings)
+        is FixAction.RestrictApp -> stringResource(R.string.confirm_restrict, action.packageName)
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(action.label) },
+        title = { Text(action.label.asString()) },
         text = { Text(details) },
-        confirmButton = { TextButton(onClick = { onConfirm(action) }) { Text("Wykonaj") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Anuluj") } },
+        confirmButton = { TextButton(onClick = { onConfirm(action) }) { Text(stringResource(R.string.confirm_run)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -100,12 +101,12 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab(val label: String, val icon: Int) {
-    LIVE("Na żywo", android.R.drawable.ic_menu_recent_history),
-    CHARGING("Ładowanie", android.R.drawable.ic_lock_idle_charging),
-    DIAGNOSIS("Diagnoza", android.R.drawable.ic_menu_search),
-    HISTORY("Historia", android.R.drawable.ic_menu_my_calendar),
-    ACTIONS("Akcje", android.R.drawable.ic_menu_manage),
+private enum class Tab(val label: Int, val icon: Int) {
+    LIVE(R.string.tab_live, android.R.drawable.ic_menu_recent_history),
+    CHARGING(R.string.tab_charging, android.R.drawable.ic_lock_idle_charging),
+    DIAGNOSIS(R.string.tab_diagnosis, android.R.drawable.ic_menu_search),
+    HISTORY(R.string.tab_history, android.R.drawable.ic_menu_my_calendar),
+    ACTIONS(R.string.tab_actions, android.R.drawable.ic_menu_manage),
 }
 
 @Composable
@@ -140,7 +141,7 @@ private fun App(vm: MainViewModel) {
                         selected = tab == i,
                         onClick = { tab = i },
                         icon = { Icon(painterResource(t.icon), contentDescription = null) },
-                        label = { Text(t.label, maxLines = 1) },
+                        label = { Text(stringResource(t.label), maxLines = 1) },
                     )
                 }
             }
@@ -180,15 +181,11 @@ private fun PermissionBanner(p: PermissionStatus) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
     ) {
         Column(Modifier.padding(12.dp)) {
-            Text("Brakuje uprawnień", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "Uruchom setup_permissions.sh na komputerze z podłączonym telefonem. Na OnePlus najpierw włącz " +
-                    "w Opcjach programisty „Wyłącz monitorowanie uprawnień”.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text(stringResource(R.string.perm_missing_title), style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.perm_missing_text), style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = {
                 ctx.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("adb", commands))
-            }) { Text("Kopiuj polecenia adb") }
+            }) { Text(stringResource(R.string.perm_copy_adb)) }
         }
     }
 }

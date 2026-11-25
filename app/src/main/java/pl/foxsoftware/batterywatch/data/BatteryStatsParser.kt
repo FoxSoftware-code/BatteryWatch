@@ -137,7 +137,7 @@ object BatteryStatsParser {
         val all = dump.lines()
         val start = all.indexOfFirst { it.startsWith("Statistics since last charge") }
         require(start >= 0) {
-            "Brak sekcji 'Statistics since last charge' w wyjściu dumpsys batterystats. Początek wyjścia: " +
+            "No 'Statistics since last charge' section in dumpsys batterystats output. Output starts with: " +
                 dump.take(200)
         }
         var end = all.size

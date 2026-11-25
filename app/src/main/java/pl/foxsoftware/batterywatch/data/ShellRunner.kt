@@ -5,7 +5,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import rikka.shizuku.Shizuku
 
-class PermissionDeniedException(message: String) : Exception(message)
+/** [permission]: nazwa brakującego uprawnienia (np. DUMP); komunikat dla użytkownika buduje UI. */
+class PermissionDeniedException(val permission: String) : Exception("Permission denied: $permission")
 
 /** Uruchamia polecenia jako proces aplikacji (dumpsys działa dzięki nadanemu przez adb uprawnieniu DUMP). */
 object ShellRunner {
@@ -14,7 +15,7 @@ object ShellRunner {
         val out = exec(listOf("dumpsys", *args))
         if (out.startsWith("Permission Denial")) {
             val missing = Regex("""android\.permission\.(\w+)""").find(out)?.groupValues?.get(1) ?: "?"
-            throw PermissionDeniedException("System odmówił dostępu (brak $missing). Uruchom setup_permissions.sh na komputerze.")
+            throw PermissionDeniedException(missing)
         }
         out
     }
@@ -57,7 +58,7 @@ object ShizukuShell {
 
     /** Shizuku API 13 ukrywa newProcess; to jest najprostsza droga bez pisania UserService. */
     suspend fun run(command: String): Result = withContext(Dispatchers.IO) {
-        check(hasPermission()) { "Shizuku nie działa albo nie ma uprawnienia" }
+        check(hasPermission()) { "Shizuku is not running or has no permission" }
         val m = Shizuku::class.java.getDeclaredMethod(
             "newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java,
         )

@@ -1,28 +1,32 @@
 package pl.foxsoftware.batterywatch.domain
 
+import androidx.annotation.StringRes
+import pl.foxsoftware.batterywatch.R
 import pl.foxsoftware.batterywatch.data.AppUsage
 import pl.foxsoftware.batterywatch.data.BatteryStatsReport
 import kotlin.math.roundToInt
 
-enum class Severity(val label: String) { HIGH("Wysoki"), MEDIUM("Średni"), LOW("Niski"), INFO("Info") }
+enum class Severity(@StringRes val label: Int) {
+    HIGH(R.string.severity_high), MEDIUM(R.string.severity_medium), LOW(R.string.severity_low), INFO(R.string.severity_info),
+}
 
 /** Akcja proponowana przy ustaleniu. Wykonanie w [ActionExecutor]. */
 sealed interface FixAction {
-    val label: String
+    val label: Txt
 
-    data class SetGlobal(val key: String, val value: Int, override val label: String) : FixAction
-    data class SetSystem(val key: String, val value: Int, override val label: String) : FixAction
+    data class SetGlobal(val key: String, val value: Int, override val label: Txt) : FixAction
+    data class SetSystem(val key: String, val value: Int, override val label: Txt) : FixAction
     /** Wymaga Shizuku; bez niego [fallback]. */
-    data class ShellCommand(val command: String, val undoCommand: String?, override val label: String, val fallback: FixAction?) : FixAction
-    data class OpenSettings(val intentAction: String, override val label: String, val packageName: String? = null) : FixAction
-    data class RestrictApp(val packageName: String, override val label: String = "Ogranicz w tle") : FixAction
+    data class ShellCommand(val command: String, val undoCommand: String?, override val label: Txt, val fallback: FixAction?) : FixAction
+    data class OpenSettings(val intentAction: String, override val label: Txt, val packageName: String? = null) : FixAction
+    data class RestrictApp(val packageName: String, override val label: Txt = txt(R.string.action_restrict_background)) : FixAction
 }
 
 data class Finding(
     val id: String,
     val severity: Severity,
-    val title: String,
-    val detail: String,
+    val title: Txt,
+    val detail: Txt,
     val actions: List<FixAction> = emptyList(),
 )
 
@@ -73,9 +77,11 @@ object FindingsEngine {
             }
             if (sev != null) out += Finding(
                 "screen_off_drain", sev,
-                "Ekran zgaszony: %.1f%%/h (norma < 1%%/h)".format(rate),
-                "Przez ${fmt(r.screenOffTimeMs)} zgaszonego ekranu zeszło ${r.dischargedPctScreenOff}% " +
-                    "(${r.screenOffDischargeMah.roundToInt()} mAh). Poniżej przyczyny, które to wyjaśniają.",
+                txt(R.string.finding_screen_off_drain_title, rate),
+                txt(
+                    R.string.finding_screen_off_drain_detail,
+                    fmt(r.screenOffTimeMs), r.dischargedPctScreenOff, r.screenOffDischargeMah.roundToInt(),
+                ),
             )
         }
 
@@ -85,24 +91,27 @@ object FindingsEngine {
             val share = if (r.dischargeMah > 0) r.screenOnDischargeMah / r.dischargeMah * 100 else 0.0
             if (share > 60 && (bright > 35 || device.autoBrightness == false)) out += Finding(
                 "screen_on", Severity.MEDIUM,
-                "Ekran to ${share.roundToInt()}% zużycia, często na wysokiej jasności",
-                "Ekran włączony: %.1f%%/h, %.0f%% czasu w najwyższym kubełku jasności.".format(r.screenOnPctPerHour, bright) +
-                    if (device.autoBrightness == false) " Automatyczna jasność jest wyłączona." else "",
+                txt(R.string.finding_screen_on_title, share.roundToInt()),
+                joinTxt(
+                    txt(R.string.finding_screen_on_detail, r.screenOnPctPerHour, bright),
+                    if (device.autoBrightness == false) txt(R.string.finding_auto_brightness_off) else null,
+                ),
                 listOfNotNull(
-                    if (device.autoBrightness == false) FixAction.SetSystem("screen_brightness_mode", 1, "Włącz auto-jasność") else null,
-                    FixAction.OpenSettings(ACTION_DISPLAY_SETTINGS, "Ustawienia wyświetlacza (120 Hz, AOD)"),
+                    if (device.autoBrightness == false) {
+                        FixAction.SetSystem("screen_brightness_mode", 1, txt(R.string.action_enable_auto_brightness))
+                    } else null,
+                    FixAction.OpenSettings(ACTION_DISPLAY_SETTINGS, txt(R.string.action_display_settings)),
                 ),
             )
         }
         device.screenOffTimeoutMs?.let { t ->
             if (t > 120_000) out += Finding(
                 "timeout", if (t >= 600_000) Severity.MEDIUM else Severity.LOW,
-                "Ekran gaśnie dopiero po ${fmt(t)}",
-                "Każde odłożenie telefonu bez blokady to ekran świecący bez potrzeby.",
-                listOf(
-                    FixAction.SetSystem("screen_off_timeout", 30_000, "Ustaw 30 s"),
-                    FixAction.SetSystem("screen_off_timeout", 60_000, "Ustaw 1 min"),
-                ),
+                txt(R.string.finding_timeout_title, fmt(t)),
+                txt(R.string.finding_timeout_detail),
+                listOf(30_000, 60_000).map {
+                    FixAction.SetSystem("screen_off_timeout", it, txt(R.string.action_set_timeout, fmt(it.toLong())))
+                },
             )
         }
 
@@ -116,11 +125,13 @@ object FindingsEngine {
                 val gesture = culprit?.let { packageOf(it.uid) }?.contains("gesture") == true
                 out += Finding(
                     "flashlight_screen_off", if (ms > 20 * 60_000) Severity.HIGH else Severity.MEDIUM,
-                    "Latarka świeciła ${fmt(ms)} przy zgaszonym ekranie",
-                    "${f.mah.roundToInt()} mAh" + (who?.let { ", włączona przez: $it" } ?: "") +
-                        if (gesture || device.screenOffGestures == true)
-                            ". Najpewniej gest na zgaszonym ekranie odpala ją w kieszeni." else ".",
-                    listOf(FixAction.OpenSettings(ACTION_OPLUS_GESTURES, "Gesty przy zgaszonym ekranie")),
+                    txt(R.string.finding_flashlight_title, fmt(ms)),
+                    joinTxt(
+                        who?.let { txt(R.string.finding_flashlight_by, f.mah.roundToInt(), it) }
+                            ?: txt(R.string.finding_flashlight_mah, f.mah.roundToInt()),
+                        if (gesture || device.screenOffGestures == true) txt(R.string.finding_flashlight_gesture) else null,
+                    ),
+                    listOf(FixAction.OpenSettings(ACTION_OPLUS_GESTURES, txt(R.string.action_screen_off_gestures))),
                 )
             }
         }
@@ -129,16 +140,14 @@ object FindingsEngine {
         val onBattH = r.timeOnBatteryMs / 3_600_000.0
         if (onBattH > 1 && r.connectivityChanges / onBattH > 30) out += Finding(
             "connectivity", if (r.connectivityChanges / onBattH > 100) Severity.HIGH else Severity.MEDIUM,
-            "Niestabilna łączność: ${r.connectivityChanges} zmian sieci",
-            "Wi-Fi rozłączone przez ${fmt(r.wifiDisconnectedMs)}, słaby sygnał komórkowy przez " +
-                "%.0f%% czasu. Każde przełączenie budzi modem i CPU. ".format(r.cellPoorSignalPct) +
-                "Pomaga wyłączenie przełączania Wi-Fi/sieć komórkowa (asystent Wi-Fi) i zapomnienie słabych sieci.",
-            listOf(FixAction.OpenSettings(ACTION_WIFI_SETTINGS, "Ustawienia Wi-Fi")),
+            txt(R.string.finding_connectivity_title, r.connectivityChanges),
+            txt(R.string.finding_connectivity_detail, fmt(r.wifiDisconnectedMs), r.cellPoorSignalPct),
+            listOf(FixAction.OpenSettings(ACTION_WIFI_SETTINGS, txt(R.string.action_wifi_settings))),
         )
         if (r.wifiMulticastWakelockMs > 30 * 60_000) out += Finding(
             "multicast", Severity.LOW,
-            "Wi-Fi multicast trzymał wakelock ${fmt(r.wifiMulticastWakelockMs)}",
-            "Zwykle to aplikacje wykrywające urządzenia w sieci (Chromecast, kamery, smart home).",
+            txt(R.string.finding_multicast_title, fmt(r.wifiMulticastWakelockMs)),
+            txt(R.string.finding_multicast_detail),
         )
 
         // 5. Doze
@@ -146,23 +155,25 @@ object FindingsEngine {
             val deepShare = r.deepIdleMs.toDouble() / r.screenOffTimeMs * 100
             if (deepShare < 40) out += Finding(
                 "doze", Severity.MEDIUM,
-                "Głęboki Doze tylko przez %.0f%% czasu zgaszonego ekranu".format(deepShare),
-                "Telefon rzadko zasypia na dobre. Powody: ruch (kieszeń), wakelocki i alarmy aplikacji, gesty, latarka.",
+                txt(R.string.finding_doze_title, deepShare),
+                txt(R.string.finding_doze_detail),
             )
         }
 
         // 6. Skanowanie
         if (device.bleScanAlways == true || device.wifiScanAlways == true) out += Finding(
             "scanning", Severity.LOW,
-            "Skanowanie Wi-Fi/Bluetooth działa nawet przy wyłączonych modułach",
-            "Skan BT łącznie: ${fmt(r.bluetoothScanMs)}. Wyłączenie trochę pogarsza dokładność lokalizacji w budynkach.",
+            txt(R.string.finding_scanning_title),
+            txt(R.string.finding_scanning_detail, fmt(r.bluetoothScanMs)),
             listOfNotNull(
-                if (device.bleScanAlways == true) FixAction.SetGlobal("ble_scan_always_enabled", 0, "Wyłącz skan Bluetooth") else null,
+                if (device.bleScanAlways == true) {
+                    FixAction.SetGlobal("ble_scan_always_enabled", 0, txt(R.string.action_disable_bt_scan))
+                } else null,
                 if (device.wifiScanAlways == true) FixAction.ShellCommand(
                     "cmd wifi set-scan-always-available disabled",
                     "cmd wifi set-scan-always-available enabled",
-                    "Wyłącz skan Wi-Fi",
-                    FixAction.OpenSettings(ACTION_SCANNING_SETTINGS, "Wyłącz skan Wi-Fi"),
+                    txt(R.string.action_disable_wifi_scan),
+                    FixAction.OpenSettings(ACTION_SCANNING_SETTINGS, txt(R.string.action_disable_wifi_scan)),
                 ) else null,
             ),
         )
@@ -177,31 +188,33 @@ object FindingsEngine {
             if (offMah > 10) {
                 out += Finding(
                     "bg_${app.uid}", if (offMah > 40) Severity.HIGH else Severity.MEDIUM,
-                    "$name zużywa baterię przy zgaszonym ekranie (${offMah.roundToInt()} mAh)",
-                    "W tle: ${fmt(app.backgroundMs)}, usługa pierwszoplanowa: ${fmt(app.fgServiceMs)}, " +
-                        "czas CPU: ${fmt(app.cpuUserMs + app.cpuSystemMs)}, alarmy budzące: ${app.wakeupAlarms}.",
+                    txt(R.string.finding_bg_title, name, offMah.roundToInt()),
+                    txt(
+                        R.string.finding_bg_detail,
+                        fmt(app.backgroundMs), fmt(app.fgServiceMs), fmt(app.cpuUserMs + app.cpuSystemMs), app.wakeupAlarms,
+                    ),
                     restrict,
                 )
             } else if (app.wakeupAlarms > 50) {
                 out += Finding(
                     "alarms_${app.uid}", Severity.LOW,
-                    "$name budzi telefon ${app.wakeupAlarms}× (alarmy)",
-                    "Częste alarmy budzące utrudniają głęboki sen telefonu.",
+                    txt(R.string.finding_alarms_title, name, app.wakeupAlarms),
+                    txt(R.string.finding_alarms_detail),
                     restrict,
                 )
             }
             if (app.chargingMah > 500) out += Finding(
                 "charging_heavy_${app.uid}", Severity.INFO,
-                "$name mocno pracuje podczas ładowania (${app.chargingMah.roundToInt()} mAh)",
-                "Nie rozładowuje baterii, ale nagrzewa ją w trakcie ładowania, co przyspiesza jej zużycie.",
+                txt(R.string.finding_charging_heavy_title, name, app.chargingMah.roundToInt()),
+                txt(R.string.finding_charging_heavy_detail),
             )
         }
         r.partialWakelocks.filter { it.durationMs > 10 * 60_000 }.forEach { w ->
             val uid = w.owner?.let(pl.foxsoftware.batterywatch.data.BatteryStatsParser::parseUid)
             out += Finding(
                 "wl_${w.owner}_${w.name}", Severity.LOW,
-                "Wakelock ${fmt(w.durationMs)}: ${uid?.let(appName) ?: w.owner}",
-                "${w.name} (${w.count}×). Audio/odtwarzanie muzyki to normalny powód.",
+                txt(R.string.finding_wakelock_title, fmt(w.durationMs), uid?.let(appName) ?: w.owner),
+                txt(R.string.finding_wakelock_detail, w.name, w.count),
             )
         }
 
@@ -213,9 +226,8 @@ object FindingsEngine {
             val health = fullMah / r.estimatedCapacityMah * 100
             if (health < 85) out += Finding(
                 "battery_health", if (health < 75) Severity.MEDIUM else Severity.LOW,
-                "Bateria może mieć ok. %.0f%% pojemności".format(health),
-                "Licznik ładunku: ${(counter / 1000)} mAh przy $level%% → ~${fullMah.roundToInt()} z ${r.estimatedCapacityMah} mAh. ".replace("%%", "%") +
-                    "To przybliżenie; sprawdź Ustawienia → Bateria → Kondycja baterii.",
+                txt(R.string.finding_health_title, health),
+                txt(R.string.finding_health_detail, counter / 1000, level, fullMah.roundToInt(), r.estimatedCapacityMah),
             )
         }
 

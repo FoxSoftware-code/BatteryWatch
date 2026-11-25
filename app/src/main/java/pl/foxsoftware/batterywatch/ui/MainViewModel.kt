@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import pl.foxsoftware.batterywatch.R
 import pl.foxsoftware.batterywatch.charging.ChargingMonitorService
 import pl.foxsoftware.batterywatch.charging.ChargingTrigger
 import pl.foxsoftware.batterywatch.data.AppNames
@@ -25,7 +26,9 @@ import pl.foxsoftware.batterywatch.data.DeviceReader
 import pl.foxsoftware.batterywatch.data.HistoryDb
 import pl.foxsoftware.batterywatch.data.HistoryStats
 import pl.foxsoftware.batterywatch.data.LiveBattery
+import pl.foxsoftware.batterywatch.data.PermissionDeniedException
 import pl.foxsoftware.batterywatch.data.PermissionStatus
+import pl.foxsoftware.batterywatch.data.Plug
 import pl.foxsoftware.batterywatch.data.Sample
 import pl.foxsoftware.batterywatch.data.ShellRunner
 import pl.foxsoftware.batterywatch.data.ShizukuShell
@@ -121,6 +124,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    private fun str(id: Int, vararg args: Any): String = getApplication<Application>().getString(id, *args)
+
     fun refreshStatus() {
         _permissions.value = reader.permissions()
         _snapshot.value = reader.snapshot()
@@ -151,8 +156,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 report to FindingsEngine.evaluate(report, snap, names::name, names::packageOf, names::restrictablePackage)
             }
             _diagnosis.value = DiagnosisState(report = result.first, findings = result.second, analyzedAt = System.currentTimeMillis())
+        } catch (e: PermissionDeniedException) {
+            _diagnosis.update { it.copy(loading = false, error = str(R.string.err_permission_denied, e.permission)) }
         } catch (e: Exception) {
-            _diagnosis.update { it.copy(loading = false, error = e.message ?: e.toString()) }
+            _diagnosis.update { it.copy(loading = false, error = str(R.string.err_analysis, e.message ?: e.toString())) }
         }
     }
 
@@ -165,7 +172,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _message.value = try {
             executor.execute(action)
         } catch (e: Exception) {
-            "Błąd: ${e.message}"
+            str(R.string.msg_error, e.message.orEmpty())
         }
         refreshStatus()
     }
@@ -202,7 +209,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val samples = chargingDb.samples(session.id)
                 val summary = ChargingAnalyzer.summarize(samples, design)
                 val notes = summary?.let {
-                    ChargingAnalyzer.notes(it, session.maxChargerW, design, wired = session.plug == "ładowarka" || session.plug == "USB")
+                    ChargingAnalyzer.notes(it, session.maxChargerW, design, wired = Plug.isWired(session.plug))
                 }.orEmpty()
                 ChargingDetail(session, samples, summary, notes)
             }
@@ -235,19 +242,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun startChargingMonitor() {
         val app = getApplication<Application>()
         if (!reader.charger().connected) {
-            _message.value = "Podłącz ładowarkę – monitor działa tylko podczas ładowania."
+            _message.value = str(R.string.msg_plug_in)
             return
         }
         chargingPrefs.suppressedUntilUnplug = false
         chargingPrefs.lastAutoStartFailedAt = 0
         selectedSessionId = null
-        if (!ChargingMonitorService.start(app)) _message.value = "System nie pozwolił uruchomić monitora."
+        if (!ChargingMonitorService.start(app)) _message.value = str(R.string.msg_monitor_blocked)
         refreshCharging()
     }
 
     fun stopChargingMonitor() {
         ChargingMonitorService.stop(getApplication())
-        _message.value = "Monitor zatrzymany do odłączenia ładowarki."
+        _message.value = str(R.string.msg_monitor_stopped)
     }
 
     fun setAutoMonitor(on: Boolean) {

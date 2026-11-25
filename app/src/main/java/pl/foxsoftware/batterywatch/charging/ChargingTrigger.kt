@@ -14,6 +14,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import pl.foxsoftware.batterywatch.MainActivity
+import pl.foxsoftware.batterywatch.R
 import pl.foxsoftware.batterywatch.data.ChargingPrefs
 
 /**
@@ -51,8 +52,8 @@ class ChargingTrigger(context: Context, params: WorkerParameters) : CoroutineWor
             103,
             Notification.Builder(ctx, ChargingMonitorService.CHANNEL_ALERTS)
                 .setSmallIcon(android.R.drawable.ic_lock_idle_charging)
-                .setContentTitle("Wykryto ładowanie")
-                .setContentText("Dotknij, aby monitorować ładowanie. Uruchom setup_permissions.sh, by działało automatycznie.")
+                .setContentTitle(ctx.getString(R.string.notif_tap_title))
+                .setContentText(ctx.getString(R.string.notif_tap_text))
                 .setAutoCancel(true)
                 .setContentIntent(pi)
                 .build(),

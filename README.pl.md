@@ -13,6 +13,9 @@ zamienia je w czytelną diagnozę i proponuje konkretne poprawki. Każdą z nich
 
 > Aplikacja **nie ma uprawnienia do internetu**. Wszystkie pomiary i historia zostają na telefonie.
 
+Interfejs jest dostępny po **polsku** i **angielsku** i dopasowuje się do języka systemu. Na Androidzie 13+
+język można też wybrać osobno dla aplikacji: Ustawienia → Aplikacje → Strażnik Baterii → Język.
+
 ## Funkcje
 
 | Ekran | Co pokazuje |

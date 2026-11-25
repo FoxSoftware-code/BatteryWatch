@@ -12,6 +12,8 @@ import android.os.Build
 import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
+import androidx.annotation.StringRes
+import pl.foxsoftware.batterywatch.R
 import pl.foxsoftware.batterywatch.domain.DeviceSnapshot
 import kotlin.math.abs
 
@@ -23,6 +25,7 @@ data class LiveBattery(
     val voltageMv: Int,
     val temperatureC: Double,
     val charging: Boolean,
+    /** Kod z [Plug] albo null, gdy na baterii. */
     val plugged: String?,
     val chargeCounterUah: Long?,
     val screenOn: Boolean,
@@ -44,11 +47,12 @@ data class PermissionStatus(
 data class ChargerInfo(
     /** BatteryManager.BATTERY_PLUGGED_*; 0 = odłączony. */
     val pluggedRaw: Int,
+    /** Kod z [Plug]. */
     val plugged: String?,
     val status: Int,
     /** Moc deklarowana przez ładowarkę (max_charging_current × max_charging_voltage). */
     val maxChargerW: Double?,
-    val health: String,
+    @StringRes val health: Int,
     val cycleCount: Int?,
     /** State of Health w %, jeśli system go udostępnia. */
     val stateOfHealthPct: Int?,
@@ -56,13 +60,14 @@ data class ChargerInfo(
 ) {
     val connected get() = pluggedRaw != 0
     val wired get() = pluggedRaw == BatteryManager.BATTERY_PLUGGED_AC || pluggedRaw == BatteryManager.BATTERY_PLUGGED_USB
-    val statusLabel: String
+    @get:StringRes
+    val statusLabel: Int
         get() = when (status) {
-            BatteryManager.BATTERY_STATUS_CHARGING -> "ładuje"
-            BatteryManager.BATTERY_STATUS_FULL -> "naładowana"
-            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "podłączona, wstrzymane"
-            BatteryManager.BATTERY_STATUS_DISCHARGING -> "rozładowuje"
-            else -> "nieznany"
+            BatteryManager.BATTERY_STATUS_CHARGING -> R.string.status_charging
+            BatteryManager.BATTERY_STATUS_FULL -> R.string.status_full
+            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> R.string.status_not_charging
+            BatteryManager.BATTERY_STATUS_DISCHARGING -> R.string.status_discharging
+            else -> R.string.status_unknown
         }
 }
 
@@ -113,13 +118,13 @@ class DeviceReader(private val context: Context) {
             status = sticky?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1,
             maxChargerW = maxW?.takeIf { it in 0.5..300.0 },
             health = when (sticky?.getIntExtra(BatteryManager.EXTRA_HEALTH, 0)) {
-                BatteryManager.BATTERY_HEALTH_GOOD -> "dobra"
-                BatteryManager.BATTERY_HEALTH_OVERHEAT -> "przegrzana"
-                BatteryManager.BATTERY_HEALTH_DEAD -> "zużyta"
-                BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "przepięcie"
-                BatteryManager.BATTERY_HEALTH_COLD -> "za zimna"
-                BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "błąd"
-                else -> "nieznana"
+                BatteryManager.BATTERY_HEALTH_GOOD -> R.string.health_good
+                BatteryManager.BATTERY_HEALTH_OVERHEAT -> R.string.health_overheat
+                BatteryManager.BATTERY_HEALTH_DEAD -> R.string.health_dead
+                BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> R.string.health_over_voltage
+                BatteryManager.BATTERY_HEALTH_COLD -> R.string.health_cold
+                BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> R.string.health_failure
+                else -> R.string.health_unknown
             },
             cycleCount = cycles,
             stateOfHealthPct = soh,
@@ -128,11 +133,11 @@ class DeviceReader(private val context: Context) {
     }
 
     private fun pluggedLabel(plugged: Int): String? = when (plugged) {
-        BatteryManager.BATTERY_PLUGGED_AC -> "ładowarka"
-        BatteryManager.BATTERY_PLUGGED_USB -> "USB"
-        BatteryManager.BATTERY_PLUGGED_WIRELESS -> "indukcja"
+        BatteryManager.BATTERY_PLUGGED_AC -> Plug.AC
+        BatteryManager.BATTERY_PLUGGED_USB -> Plug.USB
+        BatteryManager.BATTERY_PLUGGED_WIRELESS -> Plug.WIRELESS
         0 -> null
-        else -> "zasilanie"
+        else -> Plug.OTHER
     }
 
     /**
@@ -184,25 +189,24 @@ class AppNames(private val context: Context) {
     private val pm = context.packageManager
     private val cache = mutableMapOf<Int, Pair<String, String?>>()
 
-    private val systemUids = mapOf(
-        0 to "Jądro / root",
-        1000 to "System Android",
-        1001 to "Telefonia (radio)",
-        1002 to "Bluetooth",
-        1010 to "Wi-Fi",
-        1013 to "Media",
-        1021 to "GPS",
-        1027 to "NFC",
-        1041 to "Serwer audio",
-        1047 to "Kamera (serwer)",
-        1073 to "Stos sieciowy",
-        1082 to "ART (optymalizacja aplikacji)",
-        2000 to "Powłoka ADB",
+    private val systemUidNames = mapOf(
+        0 to R.string.uid_kernel,
+        1000 to R.string.uid_android,
+        1001 to R.string.uid_radio,
+        1041 to R.string.uid_audioserver,
+        1047 to R.string.uid_cameraserver,
+        1073 to R.string.uid_network_stack,
+        1082 to R.string.uid_art,
+        2000 to R.string.uid_shell,
     )
+
+    /** Nazwy własne, których się nie tłumaczy. */
+    private val systemUidLiterals = mapOf(1002 to "Bluetooth", 1010 to "Wi-Fi", 1013 to "Media", 1021 to "GPS", 1027 to "NFC")
 
     @Synchronized
     private fun resolve(uid: Int): Pair<String, String?> = cache.getOrPut(uid) {
-        systemUids[uid]?.let { return@getOrPut it to null }
+        systemUidNames[uid]?.let { return@getOrPut context.getString(it) to null }
+        systemUidLiterals[uid]?.let { return@getOrPut it to null }
         val pkg = pm.getPackagesForUid(uid)?.firstOrNull()
             ?: return@getOrPut "UID $uid" to null
         val label = try {
@@ -210,8 +214,7 @@ class AppNames(private val context: Context) {
         } catch (_: PackageManager.NameNotFoundException) {
             pkg
         }
-        val clone = if (uid / 100_000 > 0) " (klon)" else ""
-        "$label$clone" to pkg
+        (if (uid / 100_000 > 0) context.getString(R.string.app_clone, label) else label) to pkg
     }
 
     fun name(uid: Int): String = resolve(uid).first

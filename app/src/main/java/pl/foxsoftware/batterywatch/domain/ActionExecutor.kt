@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.Settings
 import org.json.JSONArray
 import org.json.JSONObject
+import pl.foxsoftware.batterywatch.R
 import pl.foxsoftware.batterywatch.data.ShizukuShell
 
 /** Wpis w dzienniku zmian, z danymi do cofnięcia. */
@@ -22,30 +23,35 @@ class ActionExecutor(private val context: Context) {
 
     private val prefs = context.getSharedPreferences("actions", Context.MODE_PRIVATE)
 
+    private fun str(id: Int, vararg args: Any): String = context.getString(id, *args)
+    private fun error(output: String) = str(R.string.msg_error, output.take(200))
+
     /** @return komunikat dla użytkownika. */
-    suspend fun execute(action: FixAction): String = when (action) {
+    suspend fun execute(action: FixAction): String = execute(action, action.label.resolve(context))
+
+    private suspend fun execute(action: FixAction, label: String): String = when (action) {
         is FixAction.SetGlobal -> {
             val cr = context.contentResolver
             val old = Settings.Global.getString(cr, action.key) ?: "0"
             try {
                 Settings.Global.putInt(cr, action.key, action.value)
-                log(action.label, "global", action.key, old)
-                "Zrobione: ${action.label}"
+                log(label, "global", action.key, old)
+                str(R.string.msg_done, label)
             } catch (_: SecurityException) {
-                "Brak uprawnienia WRITE_SECURE_SETTINGS (uruchom setup_permissions.sh)"
+                str(R.string.msg_no_write_secure)
             }
         }
 
         is FixAction.SetSystem -> {
             if (!Settings.System.canWrite(context)) {
                 open(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${context.packageName}")))
-                "Zezwól na modyfikację ustawień systemu i spróbuj ponownie"
+                str(R.string.msg_allow_modify_settings)
             } else {
                 val cr = context.contentResolver
                 val old = Settings.System.getString(cr, action.key) ?: "0"
                 Settings.System.putInt(cr, action.key, action.value)
-                log(action.label, "system", action.key, old)
-                "Zrobione: ${action.label}"
+                log(label, "system", action.key, old)
+                str(R.string.msg_done, label)
             }
         }
 
@@ -53,13 +59,13 @@ class ActionExecutor(private val context: Context) {
             if (ShizukuShell.hasPermission()) {
                 val r = ShizukuShell.run(action.command)
                 if (r.ok) {
-                    action.undoCommand?.let { log(action.label, "shell", action.command, it) }
-                    "Zrobione: ${action.label}"
+                    action.undoCommand?.let { log(label, "shell", action.command, it) }
+                    str(R.string.msg_done, label)
                 } else {
-                    "Błąd: ${r.output.take(200)}"
+                    error(r.output)
                 }
             } else {
-                action.fallback?.let { execute(it) } ?: "Ta akcja wymaga Shizuku"
+                action.fallback?.let { execute(it) } ?: str(R.string.msg_needs_shizuku)
             }
         }
 
@@ -67,7 +73,7 @@ class ActionExecutor(private val context: Context) {
             val intent = Intent(action.intentAction)
             action.packageName?.let { intent.data = Uri.parse("package:$it") }
             open(intent)
-            "Otwieram: ${action.label}"
+            str(R.string.msg_opening, label)
         }
 
         is FixAction.RestrictApp -> restrict(action.packageName)
@@ -76,7 +82,7 @@ class ActionExecutor(private val context: Context) {
     private suspend fun restrict(pkg: String): String {
         if (!ShizukuShell.hasPermission()) {
             open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")))
-            return "Bez Shizuku: w ustawieniach aplikacji wybierz Bateria → Ograniczone"
+            return str(R.string.msg_restrict_no_shizuku)
         }
         val oldBucket = ShizukuShell.run("am get-standby-bucket $pkg").output.trim().toIntOrNull() ?: 10
         val oldOp = Regex("""RUN_ANY_IN_BACKGROUND: (\w+)""")
@@ -84,41 +90,41 @@ class ActionExecutor(private val context: Context) {
         val r = ShizukuShell.run(
             "cmd appops set $pkg RUN_ANY_IN_BACKGROUND ignore && am set-standby-bucket $pkg restricted",
         )
-        if (!r.ok) return "Błąd: ${r.output.take(200)}"
+        if (!r.ok) return error(r.output)
         log(
-            "Ograniczono w tle: $pkg", "shell", pkg,
+            str(R.string.log_restricted, pkg), "shell", pkg,
             "cmd appops set $pkg RUN_ANY_IN_BACKGROUND $oldOp && am set-standby-bucket $pkg $oldBucket",
         )
-        return "Ograniczono $pkg w tle"
+        return str(R.string.msg_restricted, pkg)
     }
 
     suspend fun forceStop(pkg: String): String {
         if (!ShizukuShell.hasPermission()) {
             open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$pkg")))
-            return "Bez Shizuku: użyj przycisku Wymuś zatrzymanie"
+            return str(R.string.msg_force_stop_no_shizuku)
         }
         val r = ShizukuShell.run("am force-stop $pkg")
-        return if (r.ok) "Zatrzymano $pkg" else "Błąd: ${r.output.take(200)}"
+        return if (r.ok) str(R.string.msg_stopped, pkg) else error(r.output)
     }
 
     suspend fun undo(a: AppliedAction): String {
         val cr = context.contentResolver
         val msg = try {
             when (a.kind) {
-                "global" -> { Settings.Global.putString(cr, a.key, a.undoValue); "Cofnięto: ${a.description}" }
+                "global" -> { Settings.Global.putString(cr, a.key, a.undoValue); str(R.string.msg_undone, a.description) }
                 "system" -> {
-                    if (!Settings.System.canWrite(context)) return "Brak uprawnienia do zmiany ustawień systemu"
-                    Settings.System.putString(cr, a.key, a.undoValue); "Cofnięto: ${a.description}"
+                    if (!Settings.System.canWrite(context)) return str(R.string.msg_no_system_settings_perm)
+                    Settings.System.putString(cr, a.key, a.undoValue); str(R.string.msg_undone, a.description)
                 }
                 "shell" -> {
-                    if (!ShizukuShell.hasPermission()) return "Cofnięcie wymaga działającego Shizuku"
+                    if (!ShizukuShell.hasPermission()) return str(R.string.msg_undo_needs_shizuku)
                     val r = ShizukuShell.run(a.undoValue)
-                    if (r.ok) "Cofnięto: ${a.description}" else return "Błąd: ${r.output.take(200)}"
+                    if (r.ok) str(R.string.msg_undone, a.description) else return error(r.output)
                 }
-                else -> return "Nieznany typ akcji"
+                else -> return str(R.string.msg_unknown_action)
             }
         } catch (e: SecurityException) {
-            return "Brak uprawnień: ${e.message}"
+            return str(R.string.msg_no_permission, e.message.orEmpty())
         }
         save(history().filterNot { it.id == a.id })
         return msg

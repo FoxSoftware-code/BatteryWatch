@@ -1,5 +1,6 @@
 package pl.foxsoftware.batterywatch.domain
 
+import pl.foxsoftware.batterywatch.R
 import kotlin.math.max
 
 /** Jedna próbka zapisana podczas ładowania (co ~10 s). */
@@ -45,7 +46,8 @@ data class ChargeSummary(
     val etaFullMs: Long?,
 )
 
-data class ChargeNote(val severity: Severity, val title: String, val detail: String)
+/** [id] jest stały (do testów i kluczy UI), tekst rozwiązuje UI. */
+data class ChargeNote(val id: String, val severity: Severity, val title: Txt, val detail: Txt)
 
 object ChargingAnalyzer {
 
@@ -151,48 +153,50 @@ object ChargingAnalyzer {
         when {
             s.maxTempC >= 45 -> add(
                 ChargeNote(
-                    Severity.HIGH, "Bardzo wysoka temperatura (%.1f °C)".format(s.maxTempC),
-                    "Ładowanie powyżej 45 °C najszybciej zużywa baterię. Zdejmij etui, nie ładuj pod poduszką ani podczas gier.",
+                    "temp_high", Severity.HIGH, txt(R.string.note_temp_high_title, s.maxTempC), txt(R.string.note_temp_high_detail),
                 ),
             )
             s.maxTempC >= 41 -> add(
                 ChargeNote(
-                    Severity.MEDIUM, "Telefon grzał się podczas ładowania (%.1f °C)".format(s.maxTempC),
-                    "Powyżej 40 °C przez %.0f min. Najczęstsze przyczyny: używanie telefonu, etui, ciepłe otoczenie.".format(s.minutesAbove40C),
+                    "temp_warm", Severity.MEDIUM,
+                    txt(R.string.note_temp_warm_title, s.maxTempC),
+                    txt(R.string.note_temp_warm_detail, s.minutesAbove40C),
                 ),
             )
         }
         if (s.throttledMinutes >= 3) add(
             ChargeNote(
-                Severity.MEDIUM, "Ładowanie zwalniało przez temperaturę",
-                "Przez %.0f min prąd spadł poniżej 60%% szczytu przy temperaturze ≥ 39 °C, choć bateria miała < 80%%.".format(s.throttledMinutes),
+                "throttled", Severity.MEDIUM,
+                txt(R.string.note_throttled_title),
+                txt(R.string.note_throttled_detail, s.throttledMinutes),
             ),
         )
         if (s.minutesAtFull >= 60) add(
             ChargeNote(
-                Severity.LOW, "Telefon długo stał na 100%% (%.1f h)".format(s.minutesAtFull / 60),
-                "Trzymanie pełnej baterii pod ładowarką przyspiesza zużycie. Włącz w ustawieniach baterii " +
-                    "„Zoptymalizowane ładowanie” albo limit 80%, albo ustaw tu alert przy 80–90%.",
+                "at_full", Severity.LOW,
+                txt(R.string.note_at_full_title, s.minutesAtFull / 60),
+                txt(R.string.note_at_full_detail),
             ),
         )
         if (s.screenOnFraction > 0.3 && s.avgMaScreenOn != null && s.avgMaScreenOff != null && s.avgMaScreenOff > s.avgMaScreenOn) add(
             ChargeNote(
-                Severity.INFO, "Używanie telefonu spowalniało ładowanie",
-                "Ekran włączony przez %.0f%% czasu: średnio %d mA do baterii przy włączonym ekranie, %d mA przy zgaszonym."
-                    .format(s.screenOnFraction * 100, s.avgMaScreenOn, s.avgMaScreenOff),
+                "screen_use", Severity.INFO,
+                txt(R.string.note_screen_use_title),
+                txt(R.string.note_screen_use_detail, s.screenOnFraction * 100, s.avgMaScreenOn, s.avgMaScreenOff),
             ),
         )
         if (wired && s.startLevel < 70 && s.peakPowerW in 0.1..10.0) add(
             ChargeNote(
-                Severity.LOW, "Wolne ładowanie (szczyt %.1f W)".format(s.peakPowerW),
-                (maxChargerW?.let { "Ładowarka zgłasza do %.0f W. ".format(it) } ?: "") +
-                    "Słaby kabel, port USB komputera albo ładowarka bez szybkiego ładowania. Ten telefon ładuje szybko tylko z ładowarką SUPERVOOC.",
+                "slow", Severity.LOW,
+                txt(R.string.note_slow_title, s.peakPowerW),
+                joinTxt(maxChargerW?.let { txt(R.string.note_slow_charger, it) }, txt(R.string.note_slow_detail)),
             ),
         )
         if (s.minutesPaused >= 10) add(
             ChargeNote(
-                Severity.INFO, "Ładowanie wstrzymane przez %.0f min".format(s.minutesPaused),
-                "System wstrzymał ładowanie mimo podłączenia (inteligentne/zoptymalizowane ładowanie, limit 80% albo temperatura).",
+                "paused", Severity.INFO,
+                txt(R.string.note_paused_title, s.minutesPaused),
+                txt(R.string.note_paused_detail),
             ),
         )
         val cap = s.estimatedCapacityMah
@@ -200,11 +204,12 @@ object ChargingAnalyzer {
             val pct = cap * 100.0 / designCapacityMah
             add(
                 ChargeNote(
-                    if (pct < 80) Severity.MEDIUM else Severity.INFO,
-                    "Szacowana pojemność: %d mAh (%.0f%% nominalnej)".format(cap, pct),
-                    "Z ładunku dodanego między ${s.startLevel}% a ${s.endLevel}%" +
-                        (if (s.mahFromCounter) " (licznik ładunku)." else " (całka prądu, mniej dokładna).") +
-                        " Pojedynczy pomiar może się mylić o ±10%; patrz średnia z kilku sesji.",
+                    "capacity", if (pct < 80) Severity.MEDIUM else Severity.INFO,
+                    txt(R.string.note_capacity_title, cap, pct),
+                    txt(
+                        if (s.mahFromCounter) R.string.note_capacity_detail_counter else R.string.note_capacity_detail_integral,
+                        s.startLevel, s.endLevel,
+                    ),
                 ),
             )
         }

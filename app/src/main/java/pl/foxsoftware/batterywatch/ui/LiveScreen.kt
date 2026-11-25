@@ -15,8 +15,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import pl.foxsoftware.batterywatch.R
 
 @Composable
 fun LiveScreen(vm: MainViewModel) {
@@ -42,7 +44,7 @@ fun LiveScreen(vm: MainViewModel) {
     val capacity = diagnosis.report?.estimatedCapacityMah?.takeIf { it > 0 } ?: 5500
     Column(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
         if (s == null) {
-            Text("Odczyt…")
+            Text(stringResource(R.string.live_reading))
             return@Column
         }
         // Średnia z ostatnich 30 s wygładza skoki prądu
@@ -51,42 +53,47 @@ fun LiveScreen(vm: MainViewModel) {
         val pctPerHour = avgMa / capacity * 100
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatTile("Bateria", "${s.levelPct}%", Modifier.weight(1f), s.plugged?.let { "ładowanie: $it" } ?: "na baterii")
             StatTile(
-                if (s.charging) "Prąd ładowania" else "Pobór",
+                stringResource(R.string.live_battery), "${s.levelPct}%", Modifier.weight(1f),
+                plugLabel(s.plugged)?.let { stringResource(R.string.live_charging_via, it) } ?: stringResource(R.string.live_on_battery),
+            )
+            StatTile(
+                stringResource(if (s.charging) R.string.live_charge_current else R.string.live_draw),
                 "${kotlin.math.abs(s.dischargeMa)} mA",
                 Modifier.weight(1f),
                 "%.2f W".format(kotlin.math.abs(s.powerMw) / 1000),
             )
         }
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatTile("Temperatura", "%.1f °C".format(s.temperatureC), Modifier.weight(1f), "${s.voltageMv} mV")
+            StatTile(stringResource(R.string.temperature), "%.1f °C".format(s.temperatureC), Modifier.weight(1f), "${s.voltageMv} mV")
             StatTile(
-                "Tempo (30 s)",
+                stringResource(R.string.live_rate),
                 if (s.charging) "–" else "%.1f %%/h".format(pctPerHour),
                 Modifier.weight(1f),
-                if (!s.charging && pctPerHour > 0.1) "~%.1f h do 0%%".format(s.levelPct / pctPerHour) else null,
+                if (!s.charging && pctPerHour > 0.1) stringResource(R.string.live_time_to_empty, s.levelPct / pctPerHour) else null,
             )
         }
 
-        SectionTitle("Pobór prądu [mA], ostatnie ${samples.size * 2 / 60} min")
-        LineChart(samples.map { it.dischargeMa.toFloat() }, minY = 0f, caption = "co 2 s")
+        SectionTitle(stringResource(R.string.live_chart_title, samples.size * 2 / 60))
+        LineChart(samples.map { it.dischargeMa.toFloat() }, minY = 0f, caption = stringResource(R.string.live_every_2s))
         Text(
-            "Uwaga: ten ekran jest włączony, więc pokazuje pobór z ekranem. Zużycie przy zgaszonym ekranie " +
-                "zobaczysz w Diagnozie i Historii.",
+            stringResource(R.string.live_note),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
         )
 
-        SectionTitle("Najbardziej obciążające procesy" + (cpu?.window?.let { " ($it)" } ?: ""))
         val c = cpu
+        SectionTitle(
+            c?.windowSeconds?.let { stringResource(R.string.live_top_processes_window, it) }
+                ?: (stringResource(R.string.live_top_processes) + (c?.windowRaw?.let { " ($it)" } ?: "")),
+        )
         if (c == null) {
-            Text("Brak danych. Potrzebne uprawnienie DUMP.", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.live_no_cpu), style = MaterialTheme.typography.bodySmall)
         } else {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
-                    c.load?.let { Text("Obciążenie (load avg): $it", style = MaterialTheme.typography.bodySmall) }
+                    c.load?.let { Text(stringResource(R.string.live_load, it), style = MaterialTheme.typography.bodySmall) }
                     c.processes.take(12).forEach { p ->
                         KeyValueRow(p.name, "%.1f%%".format(p.totalPct), "pid ${p.pid} · user %.1f%% + kernel %.1f%%".format(p.userPct, p.kernelPct))
                     }

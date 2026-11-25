@@ -14,7 +14,8 @@ turns it into a readable diagnosis and suggests concrete fixes. Every fix can be
 
 > **No internet permission.** All measurements and history stay on your phone. No ads, no trackers.
 
-> The app's interface is currently in **Polish**. An English translation is planned. Contributions are welcome.
+> The interface is available in **English** and **Polish** and follows the system language.
+> On Android 13+ you can also pick it per app: Settings → Apps → BatteryWatch → Language.
 
 ## Features
 
@@ -104,7 +105,7 @@ addresses and the list of installed apps before sharing it.
 Contributions are welcome, especially:
 
 - **Testing on other phones** (Samsung, Pixel, Xiaomi…) and reporting what's missing
-- **English translation** of the interface
+- **Translations** into other languages: copy [`res/values/strings.xml`](app/src/main/res/values/strings.xml) to `res/values-xx/` and add the language to [`locales_config.xml`](app/src/main/res/xml/locales_config.xml). `TranslationsTest` checks that every language has the same keys and format arguments
 - New diagnosis rules in [`FindingsEngine`](app/src/main/java/pl/foxsoftware/batterywatch/domain/FindingsEngine.kt)
 
 Look for issues labeled [`good first issue`](../../issues?q=is%3Aopen+label%3A%22good+first+issue%22),

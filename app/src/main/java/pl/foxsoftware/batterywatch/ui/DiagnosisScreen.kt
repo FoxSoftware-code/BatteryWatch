@@ -23,8 +23,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import pl.foxsoftware.batterywatch.R
 import pl.foxsoftware.batterywatch.data.BatteryStatsParser
 import pl.foxsoftware.batterywatch.data.TimedEntry
 import pl.foxsoftware.batterywatch.domain.Finding
@@ -42,13 +44,13 @@ fun DiagnosisScreen(vm: MainViewModel, onAction: (FixAction) -> Unit) {
     LazyColumn(Modifier.padding(horizontal = 16.dp)) {
         item {
             Row(Modifier.padding(top = 16.dp)) {
-                Button(onClick = { vm.analyze() }, enabled = !state.loading) { Text("Analizuj ponownie") }
+                Button(onClick = { vm.analyze() }, enabled = !state.loading) { Text(stringResource(R.string.diag_reanalyze)) }
                 if (state.loading) CircularProgressIndicator(Modifier.padding(start = 16.dp))
             }
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
             state.analyzedAt?.let {
                 Text(
-                    "Dane od ostatniego pełnego ładowania · analiza ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it))}",
+                    stringResource(R.string.diag_since, DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it))),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -58,47 +60,59 @@ fun DiagnosisScreen(vm: MainViewModel, onAction: (FixAction) -> Unit) {
 
         item {
             Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatTile("Na baterii", fmt(r.timeOnBatteryMs), Modifier.weight(1f), "zeszło ${r.dischargedPctLower}–${r.dischargedPctUpper}%")
-                StatTile("Ekran włączony", "%.1f%%/h".format(r.screenOnPctPerHour), Modifier.weight(1f), "${fmt(r.screenOnTimeMs)}, ${r.screenOnCount}×")
+                StatTile(
+                    stringResource(R.string.diag_on_battery), fmt(r.timeOnBatteryMs), Modifier.weight(1f),
+                    stringResource(R.string.diag_dropped, r.dischargedPctLower, r.dischargedPctUpper),
+                )
+                StatTile(
+                    stringResource(R.string.screen_on), "%.1f%%/h".format(r.screenOnPctPerHour), Modifier.weight(1f),
+                    "${fmt(r.screenOnTimeMs)}, ${r.screenOnCount}×",
+                )
             }
             Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatTile("Ekran zgaszony", "%.1f%%/h".format(r.screenOffPctPerHour), Modifier.weight(1f), "norma < 1%/h")
-                StatTile("Głęboki sen", fmt(r.deepIdleMs), Modifier.weight(1f), "z ${fmt(r.screenOffTimeMs)} zgaszenia")
+                StatTile(
+                    stringResource(R.string.screen_off), "%.1f%%/h".format(r.screenOffPctPerHour), Modifier.weight(1f),
+                    stringResource(R.string.diag_norm),
+                )
+                StatTile(
+                    stringResource(R.string.diag_deep_sleep), fmt(r.deepIdleMs), Modifier.weight(1f),
+                    stringResource(R.string.diag_of_screen_off, fmt(r.screenOffTimeMs)),
+                )
             }
         }
 
-        item { SectionTitle("Ustalenia (${state.findings.size})") }
+        item { SectionTitle(stringResource(R.string.diag_findings, state.findings.size)) }
         items(state.findings, key = { it.id }) { FindingCard(it, onAction) }
 
-        item { SectionTitle("Aplikacje na baterii (mAh, estymata systemu)") }
+        item { SectionTitle(stringResource(R.string.diag_apps)) }
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
                     r.apps.filter { it.onBatteryMah >= 1 }.take(25).forEach { a ->
-                        val off = a.topScreenOffComponent()?.let { " · zgaszony: najwięcej $it" } ?: ""
+                        val off = a.topScreenOffComponent()?.let { " · " + stringResource(R.string.diag_app_top_off, it) } ?: ""
                         KeyValueRow(
                             vm.names.name(a.uid),
                             "%.0f".format(a.onBatteryMah),
-                            "ekran wł. %.0f · zgaszony %.0f · w tle %s%s".format(
-                                a.onBatteryScreenOnMah, a.onBatteryScreenOffMah, fmt(a.backgroundMs), off,
-                            ),
+                            stringResource(
+                                R.string.diag_app_sub, a.onBatteryScreenOnMah, a.onBatteryScreenOffMah, fmt(a.backgroundMs),
+                            ) + off,
                         )
                     }
                 }
             }
         }
-        item { TimedList("Wakelocki aplikacji (trzymanie CPU)", r.partialWakelocks) { it.owner?.let { o -> vm.names.name(BatteryStatsParser.parseUid(o)) } } }
-        item { TimedList("Wakelocki jądra", r.kernelWakelocks) { null } }
-        item { TimedList("Powody wybudzeń", r.wakeupReasons) { null } }
+        item { TimedList(stringResource(R.string.diag_app_wakelocks), r.partialWakelocks) { it.owner?.let { o -> vm.names.name(BatteryStatsParser.parseUid(o)) } } }
+        item { TimedList(stringResource(R.string.diag_kernel_wakelocks), r.kernelWakelocks) { null } }
+        item { TimedList(stringResource(R.string.diag_wakeup_reasons), r.wakeupReasons) { null } }
         item {
-            SectionTitle("Sieć")
+            SectionTitle(stringResource(R.string.diag_network))
             Card(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
                 Column(Modifier.padding(12.dp)) {
-                    KeyValueRow("Zmiany łączności", r.connectivityChanges.toString())
-                    KeyValueRow("Wi-Fi rozłączone", fmt(r.wifiDisconnectedMs))
-                    KeyValueRow("Słaby sygnał komórkowy", "%.0f%% czasu".format(r.cellPoorSignalPct))
-                    KeyValueRow("Wakelock Wi-Fi multicast", fmt(r.wifiMulticastWakelockMs))
-                    KeyValueRow("Skanowanie Bluetooth", fmt(r.bluetoothScanMs))
+                    KeyValueRow(stringResource(R.string.diag_conn_changes), r.connectivityChanges.toString())
+                    KeyValueRow(stringResource(R.string.diag_wifi_disc), fmt(r.wifiDisconnectedMs))
+                    KeyValueRow(stringResource(R.string.diag_weak_cell), stringResource(R.string.diag_pct_time, r.cellPoorSignalPct))
+                    KeyValueRow(stringResource(R.string.diag_multicast), fmt(r.wifiMulticastWakelockMs))
+                    KeyValueRow(stringResource(R.string.diag_bt_scan), fmt(r.bluetoothScanMs))
                 }
             }
         }
@@ -109,12 +123,12 @@ fun DiagnosisScreen(vm: MainViewModel, onAction: (FixAction) -> Unit) {
 private fun FindingCard(f: Finding, onAction: (FixAction) -> Unit) {
     Card(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
         Column(Modifier.padding(12.dp)) {
-            Text(f.severity.label.uppercase(), color = severityColor(f.severity), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-            Text(f.title, style = MaterialTheme.typography.titleSmall)
-            Text(f.detail, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
+            Text(stringResource(f.severity.label).uppercase(), color = severityColor(f.severity), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+            Text(f.title.asString(), style = MaterialTheme.typography.titleSmall)
+            Text(f.detail.asString(), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
             if (f.actions.isNotEmpty()) {
                 FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    f.actions.forEach { a -> OutlinedButton(onClick = { onAction(a) }) { Text(a.label) } }
+                    f.actions.forEach { a -> OutlinedButton(onClick = { onAction(a) }) { Text(a.label.asString()) } }
                 }
             }
         }
@@ -127,13 +141,13 @@ private fun TimedList(title: String, entries: List<TimedEntry>, owner: (TimedEnt
     SectionTitle(title)
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            if (entries.isEmpty()) Text("Brak danych", style = MaterialTheme.typography.bodySmall)
+            if (entries.isEmpty()) Text(stringResource(R.string.no_data), style = MaterialTheme.typography.bodySmall)
             entries.take(if (expanded) 40 else 6).forEach { e ->
                 KeyValueRow(e.name, fmt(e.durationMs), listOfNotNull(owner(e), "${e.count}×").joinToString(" · "))
             }
             if (entries.size > 6) {
                 Text(
-                    if (expanded) "Zwiń" else "Pokaż więcej (${entries.size})",
+                    if (expanded) stringResource(R.string.collapse) else stringResource(R.string.show_more, entries.size),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 4.dp).clickable { expanded = !expanded },
                 )

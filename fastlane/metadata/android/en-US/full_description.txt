@@ -13,4 +13,4 @@ BatteryWatch shows what is really draining your battery and helps you fix it. It
 
 <b>Requirements</b>: the app needs system permissions (DUMP, BATTERY_STATS, WRITE_SECURE_SETTINGS) that are granted once over ADB with the setup_permissions.sh script from the repository. Shizuku is optional.
 
-The interface is currently in Polish.
+The interface is available in English and Polish.

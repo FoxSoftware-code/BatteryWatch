@@ -54,8 +54,8 @@ class ChargingAnalyzerTest {
         assertNull(s.etaFullMs)
 
         val notes = ChargingAnalyzer.notes(s, maxChargerW = 80.0, designCapacityMah = 5500, wired = true)
-        assertTrue(notes.any { it.title.startsWith("Telefon długo stał na 100%") })
-        assertTrue(notes.any { it.title.startsWith("Szacowana pojemność") && it.severity == Severity.INFO })
+        assertTrue(notes.any { it.id == "at_full" })
+        assertTrue(notes.any { it.id == "capacity" && it.severity == Severity.INFO })
     }
 
     @Test
@@ -63,9 +63,9 @@ class ChargingAnalyzerTest {
         val s = ChargingAnalyzer.summarize(session(hotThrottle = true))!!
         assertTrue(s.throttledMinutes > 20)
         assertTrue(s.minutesAbove40C > 20)
-        val titles = ChargingAnalyzer.notes(s, null, 5500, wired = true).map { it.title }
-        assertTrue(titles.any { it.contains("zwalniało przez temperaturę") })
-        assertTrue(titles.any { it.contains("grzał się") })
+        val titles = ChargingAnalyzer.notes(s, null, 5500, wired = true).map { it.id }
+        assertTrue(titles.any { it == "throttled" })
+        assertTrue(titles.any { it == "temp_warm" })
     }
 
     @Test

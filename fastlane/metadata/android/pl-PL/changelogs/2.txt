@@ -1,0 +1,1 @@
+Interfejs po angielsku (polski nadal dostępny, zgodnie z językiem systemu). Wybór języka aplikacji na Androidzie 13+.

@@ -1,0 +1,1 @@
+English interface (Polish remains available and follows the system language). Per-app language selection on Android 13+.
