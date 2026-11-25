@@ -1,0 +1,26 @@
+# Gradle / Kotlin
+.gradle/
+.kotlin/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Lokalna konfiguracja (ścieżka do SDK, klucze)
+local.properties
+*.jks
+*.keystore
+keystore.properties
+
+# IDE
+.idea/
+*.iml
+
+# System
+.DS_Store
+Thumbs.db
+
+# Wygenerowane pliki
+*.apk
+*.aab
+*.log
