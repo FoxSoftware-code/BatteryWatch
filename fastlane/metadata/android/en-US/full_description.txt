@@ -1,0 +1,16 @@
+BatteryWatch shows what is really draining your battery and helps you fix it. It reads the same data the system uses (dumpsys batterystats, dumpsys cpuinfo), turns it into a readable diagnosis and suggests concrete fixes. Every fix can be undone.
+
+<b>No internet permission.</b> All measurements and history stay on your phone.
+
+<b>Screens</b>
+<ul>
+<li><b>Live</b>: level, current draw (mA/W), temperature, drain rate and the processes using the most CPU.</li>
+<li><b>Charging</b>: a monitor that runs only while plugged in. Rate in %/h, time to 80% and 100%, estimated battery capacity, peak power, overheating and thermal throttling detection, charts, 30-day history and alerts.</li>
+<li><b>Diagnosis</b>: batterystats analysis since the last charge (screen on/off drain, apps, wakelocks, wakeups, network) with findings sorted by severity and one-tap actions.</li>
+<li><b>History</b>: a sample every 15 minutes and separate drain rates for screen off and screen on.</li>
+<li><b>Actions</b>: auto-brightness, screen timeout, background scanning and restricting apps. Every change is confirmed and can be undone.</li>
+</ul>
+
+<b>Requirements</b>: the app needs system permissions (DUMP, BATTERY_STATS, WRITE_SECURE_SETTINGS) that are granted once over ADB with the setup_permissions.sh script from the repository. Shizuku is optional.
+
+The interface is currently in Polish.

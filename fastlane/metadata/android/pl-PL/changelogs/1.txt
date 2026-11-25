@@ -1,0 +1,1 @@
+Pierwsza publiczna wersja: podgląd na żywo, monitor ładowania, diagnoza batterystats, historia i odwracalne akcje.

@@ -1,0 +1,34 @@
+name: Bug report / Zgłoszenie błędu
+description: Something doesn't work or data is missing on your phone
+labels: [bug]
+body:
+  - type: input
+    id: device
+    attributes:
+      label: Phone model / Model telefonu
+      placeholder: e.g. Samsung Galaxy S24 (SM-S921B)
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android version / Wersja Androida
+      placeholder: e.g. Android 15, One UI 7
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / Co się stało?
+      description: Which screen, what's missing or wrong, what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Output of setup_permissions.sh
+      render: shell
+  - type: markdown
+    attributes:
+      value: |
+        ⚠️ **Don't paste a full `dumpsys batterystats` dump.** It contains your email addresses and the list of your installed apps. If a fragment is needed, remove personal data first.

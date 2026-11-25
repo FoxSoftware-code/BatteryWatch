@@ -1,0 +1,14 @@
+Strażnik Baterii pokazuje, co naprawdę zużywa baterię, i pomaga ją oszczędzać. Odczytuje te same dane, z których korzysta system (dumpsys batterystats, dumpsys cpuinfo), zamienia je w czytelną diagnozę i proponuje konkretne poprawki. Każdą z nich można cofnąć.
+
+<b>Bez uprawnienia do internetu.</b> Wszystkie pomiary i historia zostają na telefonie.
+
+<b>Ekrany</b>
+<ul>
+<li><b>Na żywo</b>: poziom, pobór prądu (mA/W), temperatura, tempo rozładowania i procesy najbardziej obciążające CPU.</li>
+<li><b>Ładowanie</b>: monitor działający tylko na zasilaniu. Tempo w %/h, czas do 80% i 100%, szacowana pojemność baterii, moc szczytowa, wykrywanie przegrzania i dławienia, wykresy, historia z 30 dni i alerty.</li>
+<li><b>Diagnoza</b>: analiza batterystats od ostatniego ładowania (zużycie przy włączonym i zgaszonym ekranie, aplikacje, wakelocki, wybudzenia, sieć) z listą ustaleń posortowanych według wagi i gotowymi akcjami.</li>
+<li><b>Historia</b>: próbka co 15 minut i osobne tempo rozładowania dla ekranu zgaszonego i włączonego.</li>
+<li><b>Akcje</b>: automatyczna jasność, czas wygaszania, skanowanie w tle i ograniczanie aplikacji. Każda zmiana wymaga potwierdzenia i można ją cofnąć.</li>
+</ul>
+
+<b>Wymagania</b>: aplikacja potrzebuje uprawnień systemowych (DUMP, BATTERY_STATS, WRITE_SECURE_SETTINGS), które nadaje się jednorazowo przez ADB skryptem setup_permissions.sh z repozytorium. Shizuku jest opcjonalne.

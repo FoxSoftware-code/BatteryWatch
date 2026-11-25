@@ -1,0 +1,1 @@
+First public release: live battery view, charging monitor, batterystats diagnosis, history and reversible actions.
